@@ -19,7 +19,7 @@ def getXlsxString(sh, i, in_columns_j):
     for item in in_columns_j.keys() :
         j = in_columns_j[item]
         if item in ('закупка','продажа','цена') :
-            if getCellXlsx(row=i, col=j, isDigit='N', sheet=sh).find('Звоните') >=0 :
+            if getCellXlsx(row=i, col=j, isDigit='N', sheet=sh).find('звоните') >=0 :
                 impValues[item] = '0.1'
             else :
                 impValues[item] = getCellXlsx(row=i, col=j, isDigit='Y', sheet=sh)
@@ -39,7 +39,7 @@ def convert2csv( dealerName, csvFName ):
 
     book = openpyxl.load_workbook(filename = fileNameIn, read_only=False, keep_vba=False, data_only=False)  # xlsx
     #sheet = book.worksheets[0]                                                                             # xlsx
-    sheet = book.sheet_by_Names[0]                                                                             # xlsx
+    sheet = book.get_sheet_by_name(basic['sheetname'])                                                      # xlsx
     log.info('-------------------  '+sheet.title +'  ----------')                                           # xlsx
 #   sheetNames = book.get_sheet_names()                                                                     # xlsx
 
@@ -49,11 +49,8 @@ def convert2csv( dealerName, csvFName ):
 
     out_cols, out_template = config_read(cfgFName, 'cols_out')
     in_cols,  in_cols_j    = config_read(cfgFName, 'cols_in')
-    brands,   discount     = config_read(cfgFName, 'discount')
     for k in in_cols_j.keys():
         in_cols_j[k] = int(in_cols_j[k])
-    for k in discount.keys():
-        discount[k] = (100 - int(discount[k]))/100
 
     outFile = open( csvFName, 'w', newline='', encoding='CP1251', errors='replace')
     csvWriter = csv.DictWriter(outFile, fieldnames=out_cols )
@@ -79,50 +76,13 @@ def convert2csv( dealerName, csvFName ):
     for i in range(1, sheet.max_row +1) :                               # xlsx
         i_last = i
         try:
-            ccc = sheet.cell( row=i, column=in_cols_j['группа'] )
-            ccc2= sheet.cell( row=i, column=in_cols_j['цена'] )
-            if   ccc.value == None:                                     # Пустая строка
-                 pass
-            elif ccc.font.color.rgb == 'FFFFFFFF':                      # Бренд
-                brand=ccc.value
-                grp = ''
-                subgrp1 = ''
-                subgrp2 = ''
-                try:
-                    brand_koeft = discount[brand.lower()]
-                except Exception as e:
-                    log.error('Exception: <' + str(e) + '> Ошибка назначения скидки в файле конфигурации' )
-                    brand_koeft = 1
-            elif ccc.fill.fgColor.rgb == 'FF746FEE':                    # Группа
-                grp = ccc.value
-                try:
-                    num = float(grp[ :grp.find(' ')])
-                except Exception as e:
-                    grp = ccc.value
-                else:
-                    grp = grp[ grp.find(' ')+1:]
-                subgrp1 = ''
-                subgrp2 = ''
-            elif ccc.fill.fgColor.rgb == 'FFE6E6E6':                    # Подгруппа-1
-                subgrp1 = ccc.value
-                try:
-                    num = float(subgrp1[ :subgrp1.find(' ')])
-                except Exception as e:
-                    subgrp1 = ccc.value
-                else:
-                    subgrp1 = subgrp1[ subgrp1.find(' ')+1:]
-                subgrp2 = ''
-            elif ccc.fill.fgColor.rgb == 'FFFAFAFA':                    # Подгруппа-2
-                subgrp2 = ccc.value
-            elif ccc2.value == None:                                    # Пустая строка
+            impValues = getXlsxString(sheet, i, in_cols_j)
+            if impValues['закупка']=='0': # (ccc.value == None) or (ccc2.value == None) :                                    # Пустая строка
                 pass
-                #print( 'Пустая строка. i=', i )
-            elif ccc.font.b == False:                                   # Обычная строка
-                impValues = getXlsxString(sheet, i, in_cols_j)
-                impValues['бренд'] = brand
-                impValues['группа'] = grp
-                impValues['подгруппа'] = subgrp1+' '+subgrp2
-
+                #print( 'Пустая строка. i=',i, impValues )
+            else :                                                      # Обычная строка
+                if  impValues['закупка']=='0.1':
+                    impValues['валюта'] = 'USD'
                 for outColName in out_template.keys() :
                     shablon = out_template[outColName]
                     for key in impValues.keys():
@@ -134,13 +94,10 @@ def convert2csv( dealerName, csvFName ):
                         shablon = str( float(vvvv) * brand_koeft )
                     recOut[outColName] = shablon
 
-#                recOut['бренд'] = brand
-#                recOut['группа'] = grp
-#                recOut['подгруппа'] = subgrp1+' '+subgrp2
                 csvWriter.writerow(recOut)
 
-            else :                                                      # нераспознана строка
-                log.info('Не распознана строка ' + str(i) + '<' + ccc.value + '>' )
+#            else :                                                      # нераспознана строка
+#                log.info('Не распознана строка ' + str(i) + '<' + ccc.value + '>' )
 
         except Exception as e:
             if str(e) == "'NoneType' object has no attribute 'rgb'":
@@ -250,7 +207,7 @@ def main( dealerName):
     log.info('         '+dealerName )
     csvFName   = ('csv_'+dealerName+'.csv').lower()
 
-    if  True: #download( dealerName):
+    if  download( dealerName):
         convert2csv( dealerName, csvFName)
     if os.path.exists( csvFName    ) : shutil.copy2( csvFName ,    'c://AV_PROM/prices/' + dealerName +'/'+csvFName )
     if os.path.exists( 'python.log') : shutil.copy2( 'python.log', 'c://AV_PROM/prices/' + dealerName +'/python.log')
