@@ -228,9 +228,9 @@ def download( cfg ):
         r = s.get(url_lk, auth=(login,password))  # ,headers = headers (И без него сработало, но где-то может понадобиться)
         # page = lxml.html.fromstring(r.text)
         # data = {'USER_LOGIN':login, 'USER_PASSWORD':password})
-        log.debug('Авторизация на %s    --- code=%d', url_lk, r.status_code)
+        log.debug('Авторизация на %s   --- code=%d', url_lk, r.status_code)
         r = s.get(url_file)
-        log.debug('Загрузка файла       --- code=%d,  %d bytes', r.status_code, len(r.content))
+        log.debug('Загрузка файла %28d bytes   --- code=%d', len(r.content), r.status_code)
         retCode = True
     except Exception as e:
         log.debug('Exception: <' + str(e) + '>')
@@ -297,9 +297,9 @@ def processing(cfgFName):
         #convert_csv2csv(cfg)
         convert_excel2csv(cfg)
     folderName = os.path.basename(os.getcwd())
-    if os.path.exists( csvFName    ) : shutil.copy2( csvFName ,    'c://AV_PROM/prices/' + folderName +'/'+csvFName )
-    if os.path.exists( 'python.log') : shutil.copy2( 'python.log', 'c://AV_PROM/prices/' + folderName +'/python.log')
-    if os.path.exists( 'python.1'  ) : shutil.copy2( 'python.log', 'c://AV_PROM/prices/' + folderName +'/python.1'  )
+    if os.path.exists(csvFName    )  : shutil.copy2(csvFName ,      'c://AV_PROM/prices/' + folderName +'/'+csvFName )
+    if os.path.exists('python.log')  : shutil.copy2('python.log',   'c://AV_PROM/prices/' + folderName +'/python.log')
+    if os.path.exists('python.log.1'): shutil.copy2('python.log.1', 'c://AV_PROM/prices/' + folderName +'/python.log.1')
     
 
 
