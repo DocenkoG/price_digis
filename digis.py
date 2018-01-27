@@ -9,8 +9,9 @@ import time
 import shutil
 import openpyxl                       # Для .xlsx
 #import xlrd                          # для .xls
-from   price_tools import getCellXlsx, getCell, quoted, dump_cell, currencyType, subInParentheses
+from   price_tools import getCellXlsx, getCell, quoted, dump_cell, currencyType, openX, sheetByName
 import csv
+import requests
 
 
 
@@ -32,18 +33,20 @@ def getXlsxString(sh, i, in_columns_j):
 
 
 
-def convert2csv( dealerName, csvFName ):
-    cfgFName   = ('cfg_'+dealerName+'.cfg').lower()
+def convert2csv( cfg ):
+    filename_in = cfg.get('basic','filename_in' )
+    filename_out= cfg.get('basic','filename_out' )
+
     fileNameIn = ('new_'+dealerName+'.xlsx').lower()
     basicNamelist, basic = config_read( cfgFName, 'basic' )
 
-    book = openpyxl.load_workbook(filename = fileNameIn, read_only=False, keep_vba=False, data_only=False)  # xlsx
+    book = openpyxl.load_workbook(filename = filename_in, read_only=False, keep_vba=False, data_only=False) # xlsx
     #sheet = book.worksheets[0]                                                                             # xlsx
     sheet = book.get_sheet_by_name(basic['sheetname'])                                                      # xlsx
     log.info('-------------------  '+sheet.title +'  ----------')                                           # xlsx
 #   sheetNames = book.get_sheet_names()                                                                     # xlsx
 
-#   book = xlrd.open_workbook( fileNameIn.encode('cp1251'), formatting_info=True)                       # xls
+#   book = xlrd.open_workbook( filename_in.encode('cp1251'), formatting_info=True)                      # xls
 #   sheet = book.sheets()[0]                                                                            # xls
 #   log.info('-------------------  '+sheet.name +'  ----------')                                        # xls
 
@@ -52,7 +55,7 @@ def convert2csv( dealerName, csvFName ):
     for k in in_cols_j.keys():
         in_cols_j[k] = int(in_cols_j[k])
 
-    outFile = open( csvFName, 'w', newline='', encoding='CP1251', errors='replace')
+    outFile = open( filename_out, 'w', newline='', encoding='CP1251', errors='replace')
     csvWriter = csv.DictWriter(outFile, fieldnames=out_cols )
     csvWriter.writeheader()
 
@@ -77,6 +80,7 @@ def convert2csv( dealerName, csvFName ):
         i_last = i
         try:
             impValues = getXlsxString(sheet, i, in_cols_j)
+            print( impValues['закупка'])
             if impValues['закупка']=='0': # (ccc.value == None) or (ccc2.value == None) :                                    # Пустая строка
                 pass
                 #print( 'Пустая строка. i=',i, impValues )
@@ -110,88 +114,166 @@ def convert2csv( dealerName, csvFName ):
 
 
 
-def config_read( cfgFName, partName ):
-    log.debug('Reading config ' + cfgFName )
-    config = configparser.ConfigParser()
-    keyList = []
-    keyDict = {}
-    if  os.path.exists(cfgFName):     
-        config.read( cfgFName, encoding='utf-8')
-        keyList = config.options(partName)
-        for vName in keyList :
-            if ('' != config.get(partName, vName)) :
-                keyDict[vName] = config.get(partName, vName)
-    else: 
-        log.debug('Нет файла конфигурации '+cfgFName)
+def convert_excel2csv(cfg):
+    csvFName  = cfg.get('basic','filename_out')
+    priceFName= cfg.get('basic','filename_in')
+    sheetName = cfg.get('basic','sheetname')
     
-    return keyList, keyDict
+    log.debug('Reading file ' + priceFName )
+    sheet = sheetByName(fileName = priceFName, sheetName = sheetName)
+    if not sheet :
+        log.error("Нет листа "+sheetName+" в файле "+ priceFName)
+        return False
+    log.debug("Sheet   "+sheetName)
+    out_cols = cfg.options("cols_out")
+    in_cols  = cfg.options("cols_in")
+    out_template = {}
+    for vName in out_cols :
+         out_template[vName] = cfg.get("cols_out", vName)
+    in_cols_j = {}
+    for vName in in_cols :
+         in_cols_j[vName] = cfg.getint("cols_in",  vName)
+    #brands,   discount     = config_read(cfgFName, 'discount')
+    #for k in discount.keys():
+    #    discount[k] = (100 - int(discount[k]))/100
+    #print(discount)
+
+    outFile = open( csvFName, 'w', newline='', encoding='CP1251', errors='replace')
+    csvWriter = csv.DictWriter(outFile, fieldnames=out_cols )
+    csvWriter.writeheader()
+
+    '''                                     # Блок проверки свойств для распознавания групп      XLSX                                  
+    for i in range(2393, 2397):                                                         
+        i_last = i
+        ccc = sheet.cell( row=i, column=in_cols_j['группа'] )
+        print(i, ccc.value)
+        print(ccc.font.name, ccc.font.sz, ccc.font.b, ccc.font.i, ccc.font.color.rgb, '------', ccc.fill.fgColor.rgb)
+        print('------')
+    '''
+    '''                                     # Блок проверки свойств для распознавания групп      XLS                                  
+    for i in range(0, 75):                                                         
+        xfx = sheet.cell_xf_index(i, 0)
+        xf  = book.xf_list[xfx]
+        bgci  = xf.background.pattern_colour_index
+        fonti = xf.font_index
+        ccc = sheet.cell(i, 0)
+        if ccc.value == None :
+            print (i, colSGrp, 'Пусто!!!')
+            continue
+                                         # Атрибуты шрифта для настройки конфига
+        font = book.font_list[fonti]
+        print( '---------------------- Строка', i, '-----------------------', sheet.cell(i, 0).value)
+        print( 'background_colour_index=',bgci)
+        print( 'fonti=', fonti, '           xf.alignment.indent_level=', xf.alignment.indent_level)
+        print( 'bold=', font.bold)
+        print( 'weight=', font.weight)
+        print( 'height=', font.height)
+        print( 'italic=', font.italic)
+        print( 'colour_index=', font.colour_index )
+        print( 'name=', font.name)
+    return
+    '''
+
+    recOut  ={}
+#    for i in range(1, sheet.nrows) :                                     # xls
+    for i in range(1, sheet.max_row +1) :                               # xlsx
+        i_last = i
+        try:
+            impValues = getXlsxString(sheet, i, in_cols_j)
+            #impValues = getXlsString(sheet, i, in_cols_j)
+            #print( impValues['закупка'])
+            if impValues['закупка']=='0': # (ccc.value == None) or (ccc2.value == None) :                                    # Пустая строка
+                pass
+                #print( 'Пустая строка. i=',i, impValues )
+            else :                                                      # Обычная строка
+                if  impValues['закупка']=='0.1':
+                    impValues['валюта'] = 'USD'
+                for outColName in out_template.keys() :
+                    shablon = out_template[outColName]
+                    for key in impValues.keys():
+                        if shablon.find(key) >= 0 :
+                            shablon = shablon.replace(key, impValues[key])
+                    if (outColName == 'закупка') and ('*' in shablon) :
+                        vvvv = float( shablon[ :shablon.find('*')     ] )
+                        #print(vvvv)
+                        shablon = str( float(vvvv) * brand_koeft )
+                    recOut[outColName] = shablon
+
+                csvWriter.writerow(recOut)
+
+        except Exception as e:
+            print(e)
+            if str(e) == "'NoneType' object has no attribute 'rgb'":
+                pass
+            else:
+                log.debug('Exception: <' + str(e) + '> при обработке строки ' + str(i) +'.' )
+
+    log.info('Обработано ' +str(i_last)+ ' строк.')
+    outFile.close()
 
 
 
-def download( dealerName ):
-    pathDwnld = './tmp'
-    pathPython2 = 'c:/Python27/python.exe'
-    retCode = False
-    fUnitName = os.path.join( dealerName +'_unittest.py')
-    if  not os.path.exists(fUnitName):
-        log.debug( 'Отсутствует юниттест для загрузки прайса ' + fUnitName)
-    else:
-        dir_befo_download = set(os.listdir(pathDwnld))
-        os.system( fUnitName)                                                           # Вызов unittest'a
-        dir_afte_download = set(os.listdir(pathDwnld))
-        new_files = list( dir_afte_download.difference(dir_befo_download))
-        if len(new_files) == 1 :   
-            new_file = new_files[0]                                                     # загружен ровно один файл. 
-            new_ext  = os.path.splitext(new_file)[-1]
-            DnewFile = os.path.join( pathDwnld,new_file)
-            new_file_date = os.path.getmtime(DnewFile)
-            log.info( 'Скачанный файл ' +DnewFile + ' имеет дату ' + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(new_file_date) ) )
-            if new_ext == '.zip':                                                       # Архив. Обработка не завершена
-                log.debug( 'Zip-архив. Разархивируем.')
-                work_dir = os.getcwd()                                                  
-                os.chdir( os.path.join( pathDwnld ))
-                dir_befo_download = set(os.listdir(os.getcwd()))
-                os.system('unzip -oj ' + new_file)
-                os.remove(new_file)   
-                dir_afte_download = set(os.listdir(os.getcwd()))
-                new_files = list( dir_afte_download.difference(dir_befo_download))
-                if len(new_files) == 1 :   
-                    new_file = new_files[0]                                             # разархивирован ровно один файл. 
-                    new_ext  = os.path.splitext(new_file)[-1]
-                    DnewFile = os.path.join( os.getcwd(),new_file)
-                    new_file_date = os.path.getmtime(DnewFile)
-                    log.debug( 'Файл из архива ' +DnewFile + ' имеет дату ' + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(new_file_date) )     )
-                    DnewPrice = DnewFile
-                elif len(new_files) >1 :
-                    log.debug( 'В архиве не единственный файл. Надо разбираться.')
-                    DnewPrice = "dummy"
-                else:
-                    log.debug( 'Нет новых файлов после разархивации. Загляни в папку юниттеста поставщика.')
-                    DnewPrice = "dummy"
-                os.chdir(work_dir)
-            elif new_ext in ( '.csv', '.htm', '.xls', '.xlsx'):
-                DnewPrice = DnewFile                                             # Имя скачанного прайса
-            if DnewPrice != "dummy" :
-                FoldName = 'old_' + dealerName + new_ext                         # Старая копия прайса, для сравнения даты
-                FnewName = 'new_' + dealerName + new_ext                         # Предыдущий прайс, с которым работает макрос
-                if  (not os.path.exists( FnewName)) or new_file_date> time.time() -60*60*24*7*3: # период устаревания.   os.path.getmtime(FnewName) : 
-                    log.debug( 'Предыдущего прайса нет или файл поставщика не старый. Копируем его.' )
-                    if os.path.exists( FoldName): os.remove( FoldName)
-                    if os.path.exists( FnewName): os.rename( FnewName, FoldName)
-                    shutil.copy2(DnewPrice, FnewName)
-                    retCode = True
-                else:
-                    log.debug( 'Файл у поставщика старый, копироавать его не надо.' )
-                # Убрать скачанные файлы
-                if  os.path.exists(DnewPrice):  os.remove(DnewPrice)   
-            
-        elif len(new_files) == 0 :        
-            log.debug( 'Не удалось скачать файл прайса ')
-        else:
-            log.debug( 'Скачалось несколько файлов. Надо разбираться ...')
 
+def download( cfg ):
+    retCode     = False
+    filename_in = cfg.get('basic','filename_in' )
+    filename_old= cfg.get('basic','filename_old')
+    login       = cfg.get('download','login'    )
+    password    = cfg.get('download','password' )
+    url_lk      = cfg.get('download','url_lk'   )
+    url_file    = cfg.get('download','url_file' )
+    
+    try:
+        s = requests.Session()
+        r = s.get(url_lk, auth=(login,password))  # ,headers = headers (И без него сработало, но где-то может понадобиться)
+        # page = lxml.html.fromstring(r.text)
+        # data = {'USER_LOGIN':login, 'USER_PASSWORD':password})
+        log.debug('Авторизация на %s    --- code=%d', url_lk, r.status_code)
+        r = s.get(url_file)
+        log.debug('Загрузка файла       --- code=%d,  %d bytes', r.status_code, len(r.content))
+        retCode = True
+    except Exception as e:
+        log.debug('Exception: <' + str(e) + '>')
+
+    if os.path.exists( filename_in) and os.path.exists( filename_old): 
+        os.remove( filename_old)
+        os.rename( filename_in, filename_old)
+    if os.path.exists( filename_in) :
+        os.rename( filename_in, filename_old)
+    f2 = open(filename_in, 'wb')                                  #Теперь записываем файл
+    f2.write(r.content)
+    f2.close()
     return retCode
 
+
+
+
+def config_read( cfgFName ):
+    cfg = configparser.ConfigParser(inline_comment_prefixes=('#'))
+    if  os.path.exists('private.cfg'):     
+        cfg.read('private.cfg', encoding='utf-8')
+    if  os.path.exists(cfgFName):     
+        cfg.read( cfgFName, encoding='utf-8')
+    else: 
+        log.debug('Нет файла конфигурации '+cfgFName)
+    return cfg
+
+
+
+def is_file_fresh(fileName, qty_days):
+    qty_seconds = qty_days *24*60*60 
+    if os.path.exists( fileName):
+        price_datetime = os.path.getmtime(fileName)
+    else:
+        log.error('Не найден файл  '+ fileName)
+        return False
+
+    if price_datetime+qty_seconds < time.time() :
+        file_age = round((time.time()-price_datetime)/24/60/60)
+        log.error('Файл "'+fileName+'" устарел!  Допустимый период '+ str(qty_days)+' дней, а ему ' + str(file_age) )
+        return False
+    else:
+        return True
 
 
 
@@ -202,20 +284,40 @@ def make_loger():
 
 
 
-def main( dealerName):
-    make_loger()
-    log.info('         '+dealerName )
-    csvFName   = ('csv_'+dealerName+'.csv').lower()
+def processing(cfgFName):
+    log.info('----------------------- Processing '+cfgFName )
+    cfg = config_read(cfgFName)
+    csvFName  = cfg.get('basic','filename_out')
+    priceFName= cfg.get('basic','filename_in')
+    
+    if cfg.has_section('download'):
+        result = download(cfg)
+    if is_file_fresh( priceFName, int(cfg.get('basic','срок годности'))):
+        #os.system( dealerName + '_converter_xlsx.xlsm')
+        #convert_csv2csv(cfg)
+        convert_excel2csv(cfg)
+    folderName = os.path.basename(os.getcwd())
+    if os.path.exists( csvFName    ) : shutil.copy2( csvFName ,    'c://AV_PROM/prices/' + folderName +'/'+csvFName )
+    if os.path.exists( 'python.log') : shutil.copy2( 'python.log', 'c://AV_PROM/prices/' + folderName +'/python.log')
+    if os.path.exists( 'python.1'  ) : shutil.copy2( 'python.log', 'c://AV_PROM/prices/' + folderName +'/python.1'  )
+    
 
-    if  download( dealerName):
-        convert2csv( dealerName, csvFName)
-    if os.path.exists( csvFName    ) : shutil.copy2( csvFName ,    'c://AV_PROM/prices/' + dealerName +'/'+csvFName )
-    if os.path.exists( 'python.log') : shutil.copy2( 'python.log', 'c://AV_PROM/prices/' + dealerName +'/python.log')
-    if os.path.exists( 'python.1'  ) : shutil.copy2( 'python.log', 'c://AV_PROM/prices/' + dealerName +'/python.1'  )
+
+def main( dealerName):
+    """ Обработка прайсов выполняется согласно файлов конфигурации.
+    Для этого в текущей папке должны быть файлы конфигурации, описывающие
+    свойства файла и правила обработки. По одному конфигу на каждый 
+    прайс или раздел прайса со своими правилами обработки
+    """
+    make_loger()
+    log.info('          '+dealerName )
+    for cfgFName in os.listdir("."):
+        if cfgFName.startswith("cfg") and cfgFName.endswith(".cfg"):
+            processing(cfgFName)
 
 
 if __name__ == '__main__':
     myName = os.path.basename(os.path.splitext(sys.argv[0])[0])
     mydir    = os.path.dirname (sys.argv[0])
     print(mydir, myName)
-    main( 'digis')
+    main( myName)
