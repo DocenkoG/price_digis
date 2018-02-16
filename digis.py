@@ -11,8 +11,6 @@ import openpyxl                       # Для .xlsx
 #import xlrd                          # для .xls
 from   price_tools import getCellXlsx, getCell, quoted, dump_cell, currencyType, openX, sheetByName
 import csv
-import requests
-
 
 
 def getXlsxString(sh, i, in_columns_j):
@@ -30,87 +28,6 @@ def getXlsxString(sh, i, in_columns_j):
         else:
             impValues[item] = getCellXlsx(row=i, col=j, isDigit='N', sheet=sh)
     return impValues
-
-
-
-def convert2csv( cfg ):
-    filename_in = cfg.get('basic','filename_in' )
-    filename_out= cfg.get('basic','filename_out' )
-
-    fileNameIn = ('new_'+dealerName+'.xlsx').lower()
-    basicNamelist, basic = config_read( cfgFName, 'basic' )
-
-    book = openpyxl.load_workbook(filename = filename_in, read_only=False, keep_vba=False, data_only=False) # xlsx
-    #sheet = book.worksheets[0]                                                                             # xlsx
-    sheet = book.get_sheet_by_name(basic['sheetname'])                                                      # xlsx
-    log.info('-------------------  '+sheet.title +'  ----------')                                           # xlsx
-#   sheetNames = book.get_sheet_names()                                                                     # xlsx
-
-#   book = xlrd.open_workbook( filename_in.encode('cp1251'), formatting_info=True)                      # xls
-#   sheet = book.sheets()[0]                                                                            # xls
-#   log.info('-------------------  '+sheet.name +'  ----------')                                        # xls
-
-    out_cols, out_template = config_read(cfgFName, 'cols_out')
-    in_cols,  in_cols_j    = config_read(cfgFName, 'cols_in')
-    for k in in_cols_j.keys():
-        in_cols_j[k] = int(in_cols_j[k])
-
-    outFile = open( filename_out, 'w', newline='', encoding='CP1251', errors='replace')
-    csvWriter = csv.DictWriter(outFile, fieldnames=out_cols )
-    csvWriter.writeheader()
-
-    '''                                            # Блок проверки свойств для распознавания групп      XLSX                                  
-    for i in range(2393, 2397):                                                         
-        i_last = i
-        ccc = sheet.cell( row=i, column=in_cols_j['группа'] )
-        print(i, ccc.value)
-        print(ccc.font.name, ccc.font.sz, ccc.font.b, ccc.font.i, ccc.font.color.rgb, '------', ccc.fill.fgColor.rgb)
-        print('------')
-    '''
-    ssss    = []
-    brand   = ''
-    grp     = ''
-    subgrp1 = ''
-    subgrp2 = ''
-    brand_koeft = 1
-    recOut  ={}
-
-#   for i in range(1, sheet.nrows) :                                    # xls
-    for i in range(1, sheet.max_row +1) :                               # xlsx
-        i_last = i
-        try:
-            impValues = getXlsxString(sheet, i, in_cols_j)
-            print( impValues['закупка'])
-            if impValues['закупка']=='0': # (ccc.value == None) or (ccc2.value == None) :                                    # Пустая строка
-                pass
-                #print( 'Пустая строка. i=',i, impValues )
-            else :                                                      # Обычная строка
-                if  impValues['закупка']=='0.1':
-                    impValues['валюта'] = 'USD'
-                for outColName in out_template.keys() :
-                    shablon = out_template[outColName]
-                    for key in impValues.keys():
-                        if shablon.find(key) >= 0 :
-                            shablon = shablon.replace(key, impValues[key])
-                    if (outColName == 'закупка') and ('*' in shablon) :
-                        vvvv = float( shablon[ :shablon.find('*')     ] )
-                        #print(vvvv)
-                        shablon = str( float(vvvv) * brand_koeft )
-                    recOut[outColName] = shablon
-
-                csvWriter.writerow(recOut)
-
-#            else :                                                      # нераспознана строка
-#                log.info('Не распознана строка ' + str(i) + '<' + ccc.value + '>' )
-
-        except Exception as e:
-            if str(e) == "'NoneType' object has no attribute 'rgb'":
-                pass
-            else:
-                log.debug('Exception: <' + str(e) + '> при обработке строки ' + str(i) +'.' )
-
-    log.info('Обработано ' +str(i_last)+ ' строк.')
-    outFile.close()
 
 
 
@@ -210,41 +127,145 @@ def convert_excel2csv(cfg):
 
     log.info('Обработано ' +str(i_last)+ ' строк.')
     outFile.close()
-
-
+    
 
 
 def download( cfg ):
+    from selenium import webdriver
+    from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver.remote.remote_connection import LOGGER
+    LOGGER.setLevel(logging.WARNING)
+    
     retCode     = False
-    filename_in = cfg.get('basic','filename_in' )
-    filename_old= cfg.get('basic','filename_old')
+    filename_new= cfg.get('download','filename_new')
+    filename_old= cfg.get('download','filename_old')
     login       = cfg.get('download','login'    )
     password    = cfg.get('download','password' )
     url_lk      = cfg.get('download','url_lk'   )
     url_file    = cfg.get('download','url_file' )
-    
+
+    download_path= os.path.join(os.getcwd(), 'tmp')
+    if not os.path.exists(download_path):
+        os.mkdir(download_path)
+
+    for fName in os.listdir(download_path) :
+        os.remove( os.path.join(download_path, fName))
+    dir_befo_download = set(os.listdir(download_path))
+        
+    if os.path.exists('geckodriver.log') : os.remove('geckodriver.log')
     try:
-        s = requests.Session()
-        r = s.get(url_lk, auth=(login,password))  # ,headers = headers (И без него сработало, но где-то может понадобиться)
-        # page = lxml.html.fromstring(r.text)
-        # data = {'USER_LOGIN':login, 'USER_PASSWORD':password})
-        log.debug('Авторизация на %s   --- code=%d', url_lk, r.status_code)
-        r = s.get(url_file)
-        log.debug('Загрузка файла %28d bytes   --- code=%d', len(r.content), r.status_code)
-        retCode = True
+        ffprofile = webdriver.FirefoxProfile()
+        ffprofile.set_preference("browser.download.dir", download_path)
+        ffprofile.set_preference("browser.download.folderList",2);
+        ffprofile.set_preference("browser.helperApps.neverAsk.saveToDisk", 
+                ",application/octet-stream" + 
+                ",application/vnd.ms-excel" + 
+                ",application/vnd.msexcel" + 
+                ",application/x-excel" + 
+                ",application/x-msexcel" + 
+                ",application/zip" + 
+                ",application/xls" + 
+                ",application/vnd.ms-excel" +
+                ",application/vnd.ms-excel.addin.macroenabled.12" +
+                ",application/vnd.ms-excel.sheet.macroenabled.12" +
+                ",application/vnd.ms-excel.template.macroenabled.12" +
+                ",application/vnd.ms-excelsheet.binary.macroenabled.12" +
+                ",application/vnd.ms-fontobject" +
+                ",application/vnd.ms-htmlhelp" +
+                ",application/vnd.ms-ims" +
+                ",application/vnd.ms-lrm" +
+                ",application/vnd.ms-officetheme" +
+                ",application/vnd.ms-pki.seccat" +
+                ",application/vnd.ms-pki.stl" +
+                ",application/vnd.ms-word.document.macroenabled.12" +
+                ",application/vnd.ms-word.template.macroenabed.12" +
+                ",application/vnd.ms-works" +
+                ",application/vnd.ms-wpl" +
+                ",application/vnd.ms-xpsdocument" +
+                ",application/vnd.openofficeorg.extension" +
+                ",application/vnd.openxmformats-officedocument.wordprocessingml.document" +
+                ",application/vnd.openxmlformats-officedocument.presentationml.presentation" +
+                ",application/vnd.openxmlformats-officedocument.presentationml.slide" +
+                ",application/vnd.openxmlformats-officedocument.presentationml.slideshw" +
+                ",application/vnd.openxmlformats-officedocument.presentationml.template" +
+                ",application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" +
+                ",application/vnd.openxmlformats-officedocument.spreadsheetml.template" +
+                ",application/vnd.openxmlformats-officedocument.wordprocessingml.template" +
+                ",application/x-ms-application" +
+                ",application/x-ms-wmd" +
+                ",application/x-ms-wmz" +
+                ",application/x-ms-xbap" +
+                ",application/x-msaccess" +
+                ",application/x-msbinder" +
+                ",application/x-mscardfile" +
+                ",application/x-msclip" +
+                ",application/x-msdownload" +
+                ",application/x-msmediaview" +
+                ",application/x-msmetafile" +
+                ",application/x-mspublisher" +
+                ",application/x-msschedule" +
+                ",application/x-msterminal" +
+                ",application/x-mswrite" +
+                ",application/xml" +
+                ",application/xml-dtd" +
+                ",application/xop+xml" +
+                ",application/xslt+xml" +
+                ",application/xspf+xml" +
+                ",application/xv+xml" +
+                ",application/excel")
+        if os.name == 'posix':
+            driver = webdriver.Firefox(ffprofile, executable_path=r'/usr/local/Cellar/geckodriver/0.19.1/bin/geckodriver')
+        elif os.name == 'nt':
+            driver = webdriver.Firefox(ffprofile)
+        driver.implicitly_wait(30)
+        
+        driver.get(url_lk)
+        time.sleep(1)
+        driver.find_element_by_name("USER_LOGIN").clear()
+        driver.find_element_by_name("USER_LOGIN").send_keys(login)
+        driver.find_element_by_name("USER_PASSWORD").clear()
+        driver.find_element_by_name("USER_PASSWORD").send_keys(password)
+        driver.find_element_by_name("Login").click()
+        time.sleep(1)
+        driver.set_page_load_timeout(10)
+        try:
+            driver.get(url_file)
+            time.sleep(10)
+        except Exception as e:
+            log.debug(e)
+        #print(driver.page_source)
+        #driver.find_element_by_css_selector("input.button-container-m.btn_ExportAll").click()
+        #time.sleep(50)
+        driver.quit()
+
     except Exception as e:
         log.debug('Exception: <' + str(e) + '>')
 
-    if os.path.exists( filename_in) and os.path.exists( filename_old): 
-        os.remove( filename_old)
-        os.rename( filename_in, filename_old)
-    if os.path.exists( filename_in) :
-        os.rename( filename_in, filename_old)
-    f2 = open(filename_in, 'wb')                                  #Теперь записываем файл
-    f2.write(r.content)
-    f2.close()
-    return retCode
-
+    dir_afte_download = set(os.listdir(download_path))
+    new_files = list( dir_afte_download.difference(dir_befo_download))
+    print(new_files)
+    if len(new_files) == 0 :        
+        log.error( 'Не удалось скачать файл прайса ')
+        return False
+    elif len(new_files)>1 :
+        log.error( 'Скачалось несколько файлов. Надо разбираться ...')
+        return False
+    else:   
+        new_file = new_files[0]                                                     # загружен ровно один файл. 
+        new_ext  = os.path.splitext(new_file)[-1].lower()
+        DnewFile = os.path.join( download_path,new_file)
+        new_file_date = os.path.getmtime(DnewFile)
+        log.info( 'Скачанный файл ' +new_file + ' имеет дату ' + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(new_file_date) ) )
+        
+        print(new_ext)
+        if new_ext in ('.xls','.xlsx','.xlsb','.xlsm','.csv'):
+            if os.path.exists( filename_new) and os.path.exists( filename_old): 
+                os.remove( filename_old)
+                os.rename( filename_new, filename_old)
+            if os.path.exists( filename_new) :
+                os.rename( filename_new, filename_old)
+            shutil.copy2( DnewFile, filename_new)
+            return True
 
 
 
