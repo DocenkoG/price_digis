@@ -32,7 +32,9 @@ def getXlsxString(sh, i, in_columns_j):
 
 
 def convert_excel2csv(cfg):
-    csvFName  = cfg.get('basic','filename_out')
+    csvFNameRUR  = cfg.get('basic','filename_out_RUR')
+    csvFNameEUR  = cfg.get('basic','filename_out_EUR')
+    csvFNameUSD  = cfg.get('basic','filename_out_USD')
     priceFName= cfg.get('basic','filename_in')
     sheetName = cfg.get('basic','sheetname')
     
@@ -55,9 +57,15 @@ def convert_excel2csv(cfg):
     #    discount[k] = (100 - int(discount[k]))/100
     #print(discount)
 
-    outFile = open( csvFName, 'w', newline='', encoding='CP1251', errors='replace')
-    csvWriter = csv.DictWriter(outFile, fieldnames=out_cols )
-    csvWriter.writeheader()
+    outFileRUR = open( csvFNameRUR, 'w', newline='', encoding='CP1251', errors='replace')
+    outFileUSD = open( csvFNameUSD, 'w', newline='', encoding='CP1251', errors='replace')
+    outFileEUR = open( csvFNameEUR, 'w', newline='', encoding='CP1251', errors='replace')
+    csvWriterRUR = csv.DictWriter(outFileRUR, fieldnames=out_cols )
+    csvWriterEUR = csv.DictWriter(outFileEUR, fieldnames=out_cols )
+    csvWriterUSD = csv.DictWriter(outFileUSD, fieldnames=out_cols )
+    csvWriterRUR.writeheader()
+    csvWriterEUR.writeheader()
+    csvWriterUSD.writeheader()
 
     '''                                     # Блок проверки свойств для распознавания групп      XLSX                                  
     for i in range(2393, 2397):                                                         
@@ -116,7 +124,17 @@ def convert_excel2csv(cfg):
                         shablon = str( float(vvvv) * brand_koeft )
                     recOut[outColName] = shablon
 
-                csvWriter.writerow(recOut)
+                if (recOut['закупка']=='0.1') and (float(recOut['продажа'])>0.101):
+                    recOut['закупка'] = recOut['продажа']
+                
+                if recOut['валюта']=='USD':
+                    csvWriterUSD.writerow(recOut)
+                elif recOut['валюта']=='EUR':
+                    csvWriterEUR.writerow(recOut)
+                elif recOut['валюта']=='руб.':
+                    csvWriterRUR.writerow(recOut)
+                else :
+                    log.error('Не распознана валюта "%s" ')
 
         except Exception as e:
             print(e)
@@ -126,7 +144,9 @@ def convert_excel2csv(cfg):
                 log.debug('Exception: <' + str(e) + '> при обработке строки ' + str(i) +'.' )
 
     log.info('Обработано ' +str(i_last)+ ' строк.')
-    outFile.close()
+    outFileRUR.close()
+    outFileUSD.close()
+    outFileEUR.close()
     
 
 
@@ -308,7 +328,9 @@ def make_loger():
 def processing(cfgFName):
     log.info('----------------------- Processing '+cfgFName )
     cfg = config_read(cfgFName)
-    csvFName  = cfg.get('basic','filename_out')
+    csvFNameRUR  = cfg.get('basic','filename_out_RUR')
+    csvFNameEUR  = cfg.get('basic','filename_out_EUR')
+    csvFNameUSD  = cfg.get('basic','filename_out_USD')
     priceFName= cfg.get('basic','filename_in')
     
     if cfg.has_section('download'):
@@ -317,10 +339,6 @@ def processing(cfgFName):
         #os.system( dealerName + '_converter_xlsx.xlsm')
         #convert_csv2csv(cfg)
         convert_excel2csv(cfg)
-    folderName = os.path.basename(os.getcwd())
-    if os.path.exists(csvFName    )  : shutil.copy2(csvFName ,      'c://AV_PROM/prices/' + folderName +'/'+csvFName )
-    if os.path.exists('python.log')  : shutil.copy2('python.log',   'c://AV_PROM/prices/' + folderName +'/python.log')
-    if os.path.exists('python.log.1'): shutil.copy2('python.log.1', 'c://AV_PROM/prices/' + folderName +'/python.log.1')
     
 
 
