@@ -237,8 +237,9 @@ def download( cfg ):
             driver = webdriver.Firefox(ffprofile, executable_path=r'/usr/local/bin/geckodriver')
         elif os.name == 'nt':
             driver = webdriver.Firefox(ffprofile)
-        driver.implicitly_wait(30)
-        
+        driver.implicitly_wait(10)
+        driver.set_page_load_timeout(10)
+
         driver.get(url_lk)
         time.sleep(1)
         driver.find_element_by_name("USER_LOGIN").clear()
@@ -247,7 +248,6 @@ def download( cfg ):
         driver.find_element_by_name("USER_PASSWORD").send_keys(password)
         driver.find_element_by_name("Login").click()
         time.sleep(1)
-        driver.set_page_load_timeout(10)
         try:
             driver.get(url_file)
             time.sleep(10)
@@ -256,11 +256,11 @@ def download( cfg ):
         #print(driver.page_source)
         #driver.find_element_by_css_selector("input.button-container-m.btn_ExportAll").click()
         #time.sleep(50)
-        driver.quit()
 
     except Exception as e:
         log.debug('Exception: <' + str(e) + '>')
 
+    driver.quit()
     dir_afte_download = set(os.listdir(download_path))
     new_files = list( dir_afte_download.difference(dir_befo_download))
     print(new_files)
