@@ -131,7 +131,7 @@ def currencyType(sheet, rowx, colx):
     fmt_obj = sheet.book.format_map[xf.format_key]
     fmt_str = fmt_obj.format_str
     if '\u20bd' in fmt_str:
-        val = 'RUB'
+        val = 'RUR'
     elif '\xa3' in fmt_str:
         val = 'GBP'
     elif chr(8364) in fmt_str:

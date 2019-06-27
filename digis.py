@@ -100,19 +100,20 @@ def convert_excel2csv(cfg):
     '''
 
     recOut  ={}
-#    for i in range(1, sheet.nrows) :                                     # xls
-    for i in range(1, sheet.max_row +1) :                               # xlsx
+#   for i in range(1, sheet.nrows) :                                     # xls
+    for i in range(1, sheet.max_row +1):                                 # xlsx
         i_last = i
         try:
             impValues = getXlsxString(sheet, i, in_cols_j)
             #impValues = getXlsString(sheet, i, in_cols_j)
             #print( impValues['закупка'])
-            if impValues['закупка']=='0': # (ccc.value == None) or (ccc2.value == None) :                                    # Пустая строка
+            if impValues['закупка']=='0': # (ccc.value == None) or (ccc2.value == None) :    # Пустая строка
                 pass
-                #print( 'Пустая строка. i=',i, impValues )
-            else :                                                      # Обычная строка
-                if  impValues['закупка']=='0.1':
-                    impValues['валюта'] = 'USD'
+            else:                                                        # Обычная строка
+                if  impValues['валюта1'] == '':
+                    impValues['валюта1'] = impValues['валюта2']
+                if  impValues['закупка'] == '0.1' and impValues['продажа'] == '0.1':
+                    impValues['валюта1'] = 'USD'
                 for outColName in out_template.keys() :
                     shablon = out_template[outColName]
                     for key in impValues.keys():
@@ -120,7 +121,6 @@ def convert_excel2csv(cfg):
                             shablon = shablon.replace(key, impValues[key])
                     if (outColName == 'закупка') and ('*' in shablon) :
                         vvvv = float( shablon[ :shablon.find('*')     ] )
-                        #print(vvvv)
                         shablon = str( float(vvvv) * brand_koeft )
                     recOut[outColName] = shablon
 
@@ -234,7 +234,7 @@ def download( cfg ):
                 ",application/xv+xml" +
                 ",application/excel")
         if os.name == 'posix':
-            driver = webdriver.Firefox(ffprofile, executable_path=r'/usr/local/Cellar/geckodriver/0.19.1/bin/geckodriver')
+            driver = webdriver.Firefox(ffprofile, executable_path=r'/usr/local/bin/geckodriver')
         elif os.name == 'nt':
             driver = webdriver.Firefox(ffprofile)
         driver.implicitly_wait(30)
