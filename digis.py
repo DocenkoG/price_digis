@@ -249,6 +249,7 @@ def download( cfg ):
         time.sleep(1)
         driver.set_page_load_timeout(10)
         try:
+            time.sleep(1)
             driver.get(url_file)
             time.sleep(10)
         except Exception as e:
