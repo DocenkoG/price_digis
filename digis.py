@@ -15,12 +15,12 @@ import csv
 
 def getXlsxString(sh, i, in_columns_j):
     impValues = {}
-    for item in in_columns_j.keys() :
+    for item in in_columns_j.keys():
         j = in_columns_j[item]
-        if item in ('закупка','продажа','цена') :
-            if getCellXlsx(row=i, col=j, isDigit='N', sheet=sh).find('звоните') >=0 :
+        if item in ('закупка', 'продажа', 'цена'):
+            if getCellXlsx(row=i, col=j, isDigit='N', sheet=sh).find('звоните') >= 0:
                 impValues[item] = '0.1'
-            else :
+            else:
                 impValues[item] = getCellXlsx(row=i, col=j, isDigit='Y', sheet=sh)
             #print(sh, i, sh.cell( row=i, column=j).value, sh.cell(row=i, column=j).number_format, currencyType(sh, i, j))
         elif item == 'валюта_по_формату':
@@ -35,6 +35,13 @@ def convert_excel2csv(cfg):
     csvFNameRUR  = cfg.get('basic','filename_out_RUR')
     csvFNameEUR  = cfg.get('basic','filename_out_EUR')
     csvFNameUSD  = cfg.get('basic','filename_out_USD')
+    csvFNameRUR1 = 'csv_digis_RUR1.csv'
+    csvFNameEUR1 = 'csv_digis_EUR1.csv'
+    csvFNameUSD1 = 'csv_digis_USD1.csv'
+    csvFNameRUR2 = 'csv_digis_RUR2.csv'
+    csvFNameEUR2 = 'csv_digis_EUR2.csv'
+    csvFNameUSD2 = 'csv_digis_USD2.csv'
+
     priceFName= cfg.get('basic','filename_in')
     sheetName = cfg.get('basic','sheetname')
     
@@ -57,15 +64,24 @@ def convert_excel2csv(cfg):
     #    discount[k] = (100 - int(discount[k]))/100
     #print(discount)
 
-    outFileRUR = open( csvFNameRUR, 'w', newline='', encoding='CP1251', errors='replace')
-    outFileUSD = open( csvFNameUSD, 'w', newline='', encoding='CP1251', errors='replace')
-    outFileEUR = open( csvFNameEUR, 'w', newline='', encoding='CP1251', errors='replace')
-    csvWriterRUR = csv.DictWriter(outFileRUR, fieldnames=out_cols )
-    csvWriterEUR = csv.DictWriter(outFileEUR, fieldnames=out_cols )
-    csvWriterUSD = csv.DictWriter(outFileUSD, fieldnames=out_cols )
-    csvWriterRUR.writeheader()
-    csvWriterEUR.writeheader()
-    csvWriterUSD.writeheader()
+    outFileRUR1 = open( csvFNameRUR1, 'w', newline='', encoding='CP1251', errors='replace')
+    outFileRUR2 = open( csvFNameRUR2, 'w', newline='', encoding='CP1251', errors='replace')
+    outFileUSD1 = open( csvFNameUSD1, 'w', newline='', encoding='CP1251', errors='replace')
+    outFileUSD2 = open( csvFNameUSD2, 'w', newline='', encoding='CP1251', errors='replace')
+    outFileEUR1 = open( csvFNameEUR1, 'w', newline='', encoding='CP1251', errors='replace')
+    outFileEUR2 = open( csvFNameEUR2, 'w', newline='', encoding='CP1251', errors='replace')
+    csvWriterRUR1 = csv.DictWriter(outFileRUR1, fieldnames=out_cols )
+    csvWriterRUR2 = csv.DictWriter(outFileRUR2, fieldnames=out_cols )
+    csvWriterEUR1 = csv.DictWriter(outFileEUR1, fieldnames=out_cols )
+    csvWriterEUR2 = csv.DictWriter(outFileEUR2, fieldnames=out_cols )
+    csvWriterUSD1 = csv.DictWriter(outFileUSD1, fieldnames=out_cols )
+    csvWriterUSD2 = csv.DictWriter(outFileUSD2, fieldnames=out_cols )
+    csvWriterRUR1.writeheader()
+    csvWriterRUR2.writeheader()
+    csvWriterEUR1.writeheader()
+    csvWriterEUR2.writeheader()
+    csvWriterUSD1.writeheader()
+    csvWriterUSD2.writeheader()
 
     '''                                     # Блок проверки свойств для распознавания групп      XLSX                                  
     for i in range(2393, 2397):                                                         
@@ -110,10 +126,11 @@ def convert_excel2csv(cfg):
             if impValues['закупка']=='0': # (ccc.value == None) or (ccc2.value == None) :    # Пустая строка
                 pass
             else:                                                        # Обычная строка
-                if  impValues['валюта1'] == '':
-                    impValues['валюта1'] = impValues['валюта2']
-                if  impValues['закупка'] == '0.1' and impValues['продажа'] == '0.1':
+                if impValues['закупка'] == '0.1':
                     impValues['валюта1'] = 'USD'
+                if impValues['продажа'] == '0.1':
+                    impValues['валюта2'] = 'USD'
+
                 for outColName in out_template.keys() :
                     shablon = out_template[outColName]
                     for key in impValues.keys():
@@ -124,17 +141,23 @@ def convert_excel2csv(cfg):
                         shablon = str( float(vvvv) * brand_koeft )
                     recOut[outColName] = shablon
 
-                if (recOut['закупка']=='0.1') and (float(recOut['продажа'])>0.101):
-                    recOut['закупка'] = recOut['продажа']
-                
-                if recOut['валюта']=='USD':
-                    csvWriterUSD.writerow(recOut)
-                elif recOut['валюта']=='EUR':
-                    csvWriterEUR.writerow(recOut)
-                elif recOut['валюта']=='руб.':
-                    csvWriterRUR.writerow(recOut)
+                if recOut['валюта1']=='USD':
+                    csvWriterUSD1.writerow(recOut)
+                elif recOut['валюта1']=='EUR':
+                    csvWriterEUR1.writerow(recOut)
+                elif recOut['валюта1']=='руб.':
+                    csvWriterRUR1.writerow(recOut)
                 else :
-                    log.error('Не распознана валюта "%s" ')
+                    log.error('Не распознана валюта1 "%s" ')
+
+                if recOut['валюта2']=='USD':
+                    csvWriterUSD2.writerow(recOut)
+                elif recOut['валюта2']=='EUR':
+                    csvWriterEUR2.writerow(recOut)
+                elif recOut['валюта2']=='руб.':
+                    csvWriterRUR2.writerow(recOut)
+                else :
+                    log.error('Не распознана валюта2 "%s" ')
 
         except Exception as e:
             print(e)
@@ -144,10 +167,13 @@ def convert_excel2csv(cfg):
                 log.debug('Exception: <' + str(e) + '> при обработке строки ' + str(i) +'.' )
 
     log.info('Обработано ' +str(i_last)+ ' строк.')
-    outFileRUR.close()
-    outFileUSD.close()
-    outFileEUR.close()
-    
+    outFileRUR1.close()
+    outFileUSD1.close()
+    outFileEUR1.close()
+    outFileRUR2.close()
+    outFileUSD2.close()
+    outFileEUR2.close()
+
 
 
 def download( cfg ):
@@ -234,7 +260,7 @@ def download( cfg ):
                 ",application/xv+xml" +
                 ",application/excel")
         if os.name == 'posix':
-            driver = webdriver.Firefox(ffprofile, executable_path=r'/usr/local/bin/geckodriver')
+            driver = webdriver.Firefox(ffprofile, executable_path=r'geckodriver')  # , executable_path=r'/usr/local/bin/geckodriver')
         elif os.name == 'nt':
             driver = webdriver.Firefox(ffprofile)
         driver.implicitly_wait(10)
