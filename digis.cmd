@@ -1,5 +1,3 @@
-chcp 1251
+python.exe  digis.py
 
-"c:\Program Files\Python35\python.exe"  digis.py
-
-rem pause
+pause
